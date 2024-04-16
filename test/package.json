@@ -1,0 +1,51 @@
+{
+	"id": "hx-test",
+	"name": "hx-test",
+	"description": "your extension description",
+	"displayName": "your extension display name",
+	"version": "0.0.0",
+	"publisher": "your name",
+	"engines": {
+		"HBuilderX": "^2.7.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"main": "./extension",
+	"activationEvents": [
+		"onCommand:extension.helloWorld"
+	],
+	"contributes": {
+		"commands": [
+			{
+				"command": "extension.helloWorld",
+				"title": "Hello World"
+			}
+		],
+		"menus": {
+			"explorer/context": [
+				{
+					"command": "extension.helloWorld",
+					"group": "z_commands"
+				},
+				{
+					"group": "z_commands"
+				}
+			]
+		},
+		"configuration": {
+			"title": "Test configuration",
+			"properties": {
+				"hx-test-plugin": {
+					"type": "boolean",
+					"default": true,
+					"description": "This is a description"
+				}
+			}
+		}
+	},
+	"extensionDependencies": [
+		"plugin-manager"
+	],
+	"dependencies": {}
+}
