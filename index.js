@@ -18,25 +18,37 @@ const loadFileList = (rootPath) => {
 	return fileList.filter(f => matchReg.test(f) && fs.statSync(path.resolve(rootPath, f)).isFile())
 }
 
+const getDefaultLocaleContentStr = (rootPath, defaultLocaleName = "package.nls.json") => {
+	const defaultLocalePath = path.resolve(rootPath, defaultLocaleName)
+	return fs.readFileSync(defaultLocalePath, {encoding: "utf8"})
+}
+/**
+ * 获取默认nls文件（package.nls.json）内容
+ * 调用此函数默认该文件存在
+ * @param rootPath
+ * @param defaultLocaleName
+ * @return {Object}
+ */
+const getDefaultLocaleContent = (rootPath, defaultLocaleName = "package.nls.json") => {
+	return JSON.parse(getDefaultLocaleContentStr(rootPath, defaultLocaleName))
+}
+
 const i18nHelper = () => {
+	// todo hx执行时，是本插件路径，还是hx根路径来着？
 	const rootPath = process.cwd()
 	console.log(`当前操作路径：${rootPath}`)
 	const defaultLocalePath = path.resolve(rootPath, "package.nls.json")
-	if (!fs.existsSync(defaultLocalePath)) {
-		fs.writeFileSync(defaultLocalePath, `{\n\t\n}`, {encoding: "utf8"})
-		console.warn("未检测到package.nls.json，已自动创建")
-	}
-	const defaultLocaleContentStr = fs.readFileSync(defaultLocalePath, {encoding: "utf8"})
 
 	return {
 		/**
 		 * 根据package.json对部分可能需要的键进行拍平，生成默认nls文件；
-		 * 如果nls已存在，则只生成新增的键；
+		 * 如果nls已存在，则只更新新增的键
 		 * @param {TCoveredKeys[]} coveredKeys 占位，未启用
 		 * @param autoClean 是否自动剔除已经不存在于package.json的键
+		 * @param {string[]} keepTheseKeys 在配置了autoClean后仍想保留的键（注意：这里的键指的是已经拍平的键，如contributes.commands.0.title）
 		 */
-		generateNls(coveredKeys = [], autoClean = false) {
-			/**@type TCoveredKeys[] */
+		generateNls(coveredKeys = [], autoClean = false, keepTheseKeys = []) {
+			/** @type TCoveredKeys[] */
 			const defaultCoveredKeys = ["name", "description", "displayName", "publisher", "contributes"]
 			const data = JSON.parse(fs.readFileSync(path.resolve(rootPath, "package.json"), {encoding: "utf8"}))
 			const extractData = defaultCoveredKeys.reduce((_, k) => {
@@ -56,24 +68,79 @@ const i18nHelper = () => {
 				else if (k.endsWith(".type")) delete flatData[k]
 				else if (k.endsWith(".default")) delete flatData[k]
 			}
-			const defaultLocaleContent = JSON.parse(defaultLocaleContentStr)
+			const defaultLocaleContent = getDefaultLocaleContent(rootPath)
 			const saveNewData = {}
+			if (autoClean) {
+				keepTheseKeys.forEach(k => {
+					saveNewData[k] = defaultLocaleContent[k] || ""
+				})
+			}
 			// auto merge
 			for (let k in flatData) {
 				saveNewData[k] = defaultLocaleContent[k] || flatData[k]
 			}
 			fs.writeFileSync(defaultLocalePath, JSON.stringify(flatData, null, 4), {encoding: "utf8"})
+			console.log(`已生成/更新默认nls文件内容（${defaultLocalePath}）`)
+		},
+		/**
+		 * 生成键的映射文件，利用智能提示辅助代码构建，写代码时就不用去nls里面找key了
+		 * 推荐配合{@link i18nGet}使用
+		 * @param {string} fileName
+		 */
+		generateJsHelper(fileName="helper.js") {
+			/** @type Object */
+			const data = getDefaultLocaleContent(rootPath)
+			const keyList = Object.keys(data)
+			if (!keyList.length) return console.warn("package.nls.json内容为空，请先初始化相关数据")
+			const helperTpl = `module.exports = {\n@content\n}`
+			const content = keyList.reduce((contentGroup, k) => {
+				contentGroup.push(
+					`\t/** ${data[k]} */`,
+					`\t"${k}": "${k}",`
+				)
+				return contentGroup
+			}, []).join("\n")
+			const fsPath = path.resolve(rootPath, fileName)
+			fs.writeFileSync(fsPath, helperTpl.replace("@content", content), {encoding: "utf8"})
+			console.log(`已生成辅助文件（${fsPath}）`)
+		},
+		/**
+		 * 推荐配合{@link generateJsHelper}使用
+		 * 关于hx的国际化语言代码，[参见](https://github.com/dcloudio/hbuilderx-language-packs/blob/main/docs/localizations.md)
+		 * @param {string} key
+		 * @param {string} defaultValue 没取到时的默认值，一般不用配；默认当前locale没取到值时，会去package.nls.json取
+		 */
+		i18nGet(key, defaultValue = "") {
+			const hx = require("hbuilderx")
+			const lang = hx.env.lang
+			const fileName = `package.nls.${lang}.json`
+			const defaultFsPath = path.resolve(rootPath, "package.nls.json")
+			let fsPath = path.resolve(rootPath, fileName)
+			// 当前语言没有对应的文件时，尝试读取默认语言配置文件
+			if (!fs.existsSync(fsPath)) {
+				fsPath = defaultFsPath
+				// 都是用i18n配置了，默认文件还是要有的
+				if (!fs.existsSync(fsPath)) return console.warn(`${fsPath}不存在`)
+			}
+			const data = JSON.parse(fs.readFileSync(fsPath, {encoding: "utf8"}))
+			const dataDefault = JSON.parse(fs.readFileSync(defaultFsPath, {encoding: "utf8"}))
+			return data[key] || defaultValue || dataDefault[key]
 		},
 		/**
 		 * 初始化，不用一个个创建了
+		 * 在默认nls文件不存在时，会自动创建该文件
 		 * @param {localeCode[]} localeList
 		 */
 		initLocales(localeList) {
+			if (!fs.existsSync(defaultLocalePath)) {
+				fs.writeFileSync(defaultLocalePath, `{\n\t\n}`, {encoding: "utf8"})
+				console.warn("未检测到package.nls.json，已自动创建")
+			}
 			localeList.forEach(locale => {
 				const filename = `package.nls.${locale}.json`
 				const fsPath = path.resolve(rootPath, filename)
 				if (!fs.existsSync(fsPath)) {
-					fs.writeFileSync(fsPath, defaultLocaleContentStr, {encoding: "utf8"})
+					fs.writeFileSync(fsPath, getDefaultLocaleContentStr(rootPath), {encoding: "utf8"})
 					console.log(`[init] ${filename}已创建`)
 				}
 			})
@@ -82,7 +149,7 @@ const i18nHelper = () => {
 		 * 从package.nls.json向其他locale同步更新
 		 */
 		syncLocales() {
-			const defaultLocaleContent = JSON.parse(defaultLocaleContentStr)
+			const defaultLocaleContent = getDefaultLocaleContent(rootPath)
 			const fileList = loadFileList(rootPath)
 			fileList.forEach(f => {
 				const fsPath = path.resolve(rootPath, f)
@@ -99,4 +166,6 @@ const i18nHelper = () => {
 	}
 }
 
-export default i18nHelper
+export default {
+	i18nHelper
+}
