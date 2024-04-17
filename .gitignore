@@ -2,6 +2,7 @@
 node_modules
 dist
 package-lock.json
+test/helper.js
 test/package.nls.json
 test/package.nls.*.json
 
