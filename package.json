@@ -1,6 +1,6 @@
 {
 	"name": "hx-i18n-helper",
-	"version": "0.1.0",
+	"version": "0.3.3",
 	"description": "HBuilderX插件开发国际化辅助工具",
 	"main": "dist/index.js",
 	"scripts": {
@@ -8,6 +8,7 @@
 		"test": "cd test && node index.js"
 	},
 	"keywords": [],
+	"files": ["dist"],
 	"author": "Noah Young",
 	"license": "ISC",
 	"devDependencies": {

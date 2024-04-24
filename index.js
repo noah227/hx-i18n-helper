@@ -33,9 +33,11 @@ const getDefaultLocaleContent = (rootPath, defaultLocaleName = "package.nls.json
 	return JSON.parse(getDefaultLocaleContentStr(rootPath, defaultLocaleName))
 }
 
-const i18nHelper = () => {
-	// todo hx执行时，是本插件路径，还是hx根路径来着？
-	const rootPath = process.cwd()
+/**
+ * @param cwd 如果是在运行时使用（如i18nGet），请传入插件根路径
+ */
+const i18nHelper = (cwd = "") => {
+	const rootPath = cwd || process.cwd()
 	console.log(`当前操作路径：${rootPath}`)
 	const defaultLocalePath = path.resolve(rootPath, "package.nls.json")
 
@@ -43,13 +45,15 @@ const i18nHelper = () => {
 		/**
 		 * 根据package.json对部分可能需要的键进行拍平，生成默认nls文件；
 		 * 如果nls已存在，则只更新新增的键
+		 * 默认删除不存在与package.json中的键以避免nls文件无限堆积无用的内容
 		 * @param {TCoveredKeys[]} coveredKeys 占位，未启用
 		 * @param autoClean 是否自动剔除已经不存在于package.json的键
 		 * @param {string[]} keepTheseKeys 在配置了autoClean后仍想保留的键（注意：这里的键指的是已经拍平的键，如contributes.commands.0.title）
 		 */
-		generateNls(coveredKeys = [], autoClean = false, keepTheseKeys = []) {
+		generateNls(coveredKeys = [], autoClean = true, keepTheseKeys = []) {
 			/** @type TCoveredKeys[] */
 			const defaultCoveredKeys = ["name", "description", "displayName", "publisher", "contributes"]
+			// 读取package.json
 			const data = JSON.parse(fs.readFileSync(path.resolve(rootPath, "package.json"), {encoding: "utf8"}))
 			const extractData = defaultCoveredKeys.reduce((_, k) => {
 				_[k] = data[k]
@@ -58,6 +62,7 @@ const i18nHelper = () => {
 			// 数据一级平铺
 			// 拍平后key可能会有特殊的符号，如explorer/context，但是不影响，因为整体都是在引号内作为key使用的
 			const flatData = flatten(extractData)
+			// 删除不需要的内容
 			for (let k in flatData) {
 				// 只有string类型的才需要i18n
 				if (typeof flatData[k] !== "string") delete flatData[k]
@@ -68,18 +73,19 @@ const i18nHelper = () => {
 				else if (k.endsWith(".type")) delete flatData[k]
 				else if (k.endsWith(".default")) delete flatData[k]
 			}
+			// 加载现有nls文件
 			const defaultLocaleContent = getDefaultLocaleContent(rootPath)
 			const saveNewData = {}
+			// auto merge
+			for (let k in flatData) {
+				saveNewData[k] = flatData[k]?.startsWith("%") ? defaultLocaleContent[k] : defaultLocaleContent[k] || flatData[k]
+			}
 			if (autoClean) {
 				keepTheseKeys.forEach(k => {
 					saveNewData[k] = defaultLocaleContent[k] || ""
 				})
 			}
-			// auto merge
-			for (let k in flatData) {
-				saveNewData[k] = defaultLocaleContent[k] || flatData[k]
-			}
-			fs.writeFileSync(defaultLocalePath, JSON.stringify(flatData, null, 4), {encoding: "utf8"})
+			fs.writeFileSync(defaultLocalePath, JSON.stringify(saveNewData, null, 4), {encoding: "utf8"})
 			console.log(`已生成/更新默认nls文件内容（${defaultLocalePath}）`)
 		},
 		/**
@@ -87,7 +93,7 @@ const i18nHelper = () => {
 		 * 推荐配合{@link i18nGet}使用
 		 * @param {string} fileName
 		 */
-		generateJsHelper(fileName="helper.js") {
+		generateJsHelper(fileName = "helper.js") {
 			/** @type Object */
 			const data = getDefaultLocaleContent(rootPath)
 			const keyList = Object.keys(data)
@@ -112,7 +118,7 @@ const i18nHelper = () => {
 		 */
 		i18nGet(key, defaultValue = "") {
 			const hx = require("hbuilderx")
-			const lang = hx.env.lang
+			const lang = hx.env.language
 			const fileName = `package.nls.${lang}.json`
 			const defaultFsPath = path.resolve(rootPath, "package.nls.json")
 			let fsPath = path.resolve(rootPath, fileName)
