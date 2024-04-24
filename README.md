@@ -26,3 +26,7 @@ helper.generateJsHelper()
 // 自动判断locale并从i18n文件中获取内容，主要是在js代码中辅助使用
 helper.i18nGet("")
 ```
+
+## 使用实例
+
+* [hx-restart-ide](https://github.com/noah227/hx-restart-ide) 
