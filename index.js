@@ -41,6 +41,23 @@ const i18nHelper = (cwd = "") => {
 	console.log(`当前操作路径：${rootPath}`)
 	const defaultLocalePath = path.resolve(rootPath, "package.nls.json")
 
+	// 获取i18n数据内容
+	const getI18nData = () => {
+		const hx = require("hbuilderx")
+		const lang = hx.env.language
+		const fileName = `package.nls.${lang}.json`
+		const defaultFsPath = path.resolve(rootPath, "package.nls.json")
+		let fsPath = path.resolve(rootPath, fileName)
+		// 当前语言没有对应的文件时，尝试读取默认语言配置文件
+		if (!fs.existsSync(fsPath)) {
+			fsPath = defaultFsPath
+			// 都是用i18n配置了，默认文件还是要有的
+			if (!fs.existsSync(fsPath)) return console.warn(`${fsPath}不存在`)
+		}
+		const data = JSON.parse(fs.readFileSync(fsPath, {encoding: "utf8"}))
+		const dataDefault = JSON.parse(fs.readFileSync(defaultFsPath, {encoding: "utf8"}))
+		return {...dataDefault, ...data}
+	}
 	return {
 		/**
 		 * 根据package.json对部分可能需要的键进行拍平，生成默认nls文件；
@@ -117,20 +134,23 @@ const i18nHelper = (cwd = "") => {
 		 * @param {string} defaultValue 没取到时的默认值，一般不用配；默认当前locale没取到值时，会去package.nls.json取
 		 */
 		i18nGet(key, defaultValue = "") {
-			const hx = require("hbuilderx")
-			const lang = hx.env.language
-			const fileName = `package.nls.${lang}.json`
-			const defaultFsPath = path.resolve(rootPath, "package.nls.json")
-			let fsPath = path.resolve(rootPath, fileName)
-			// 当前语言没有对应的文件时，尝试读取默认语言配置文件
-			if (!fs.existsSync(fsPath)) {
-				fsPath = defaultFsPath
-				// 都是用i18n配置了，默认文件还是要有的
-				if (!fs.existsSync(fsPath)) return console.warn(`${fsPath}不存在`)
-			}
-			const data = JSON.parse(fs.readFileSync(fsPath, {encoding: "utf8"}))
-			const dataDefault = JSON.parse(fs.readFileSync(defaultFsPath, {encoding: "utf8"}))
-			return data[key] || defaultValue || dataDefault[key]
+			return getI18nData()[key] ?? defaultValue
+		},
+		/**
+		 * 批量获取i18n内容
+		 * @param {(string | [key, defaultValue])[]} keys
+		 */
+		i18nGets(keys) {
+			const data = getI18nData()
+			return keys.reduce((_data, item) => {
+				let key = "", defaultValue = ""
+				if (item instanceof Array) {
+					key = item[0]
+					if (item.length > 1) defaultValue = item[1]
+				} else key = item
+				_data[key] = data[key] ?? defaultValue
+				return _data
+			}, {})
 		},
 		/**
 		 * 初始化，不用一个个创建了
