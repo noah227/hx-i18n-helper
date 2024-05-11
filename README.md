@@ -23,6 +23,10 @@ helper.syncLocales()
 
 // 生成一个简单的键值对辅助文件，对于js代码内需要使用i18n的地方进行智能推断辅助
 helper.generateJsHelper()
+// 支持自定义输出文件名
+// 如果觉得在js代码里使用key太长了可以传第二个参数启用简化
+// helper.generateJsHelper("helper.js", true)
+
 // 自动判断locale并从i18n文件中获取内容，主要是在js代码中辅助使用
 helper.i18nGet("key", "这是默认值123")
 // 批量获取i18n内容，返回Object

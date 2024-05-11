@@ -34,6 +34,23 @@ const getDefaultLocaleContent = (rootPath, defaultLocaleName = "package.nls.json
 }
 
 /**
+ * @param {string} key
+ */
+const simplifyKey = (key) => {
+	const configurationStart = "contributes.configuration.properties."
+	// 类似于contributes.commands.0.title这种的
+	if(/\w+\.\d/.test(key)) {
+		const match = /\w+\.\d/.exec(key)
+		key = key.slice(match.index)
+	}
+	// 配置项的，类似于contributes.configuration.properties.hx-my-plugin.optionThis.description
+	else if(key.startsWith(configurationStart)){
+		key = key.replace(configurationStart, "")
+	}
+	return key
+}
+
+/**
  * @param cwd 如果是在运行时使用（如i18nGet），请传入插件根路径
  */
 const i18nHelper = (cwd = "") => {
@@ -109,8 +126,9 @@ const i18nHelper = (cwd = "") => {
 		 * 生成键的映射文件，利用智能提示辅助代码构建，写代码时就不用去nls里面找key了
 		 * 推荐配合{@link i18nGet}使用
 		 * @param {string} fileName
+		 * @param {boolean} useSimplifiedKey 是否使用简化的key；如果使用，请注意避免key冲突
 		 */
-		generateJsHelper(fileName = "helper.js") {
+		generateJsHelper(fileName = "helper.js", useSimplifiedKey=false) {
 			/** @type Object */
 			const data = getDefaultLocaleContent(rootPath)
 			const keyList = Object.keys(data)
@@ -119,7 +137,7 @@ const i18nHelper = (cwd = "") => {
 			const content = keyList.reduce((contentGroup, k) => {
 				contentGroup.push(
 					`\t/** ${data[k]} */`,
-					`\t"${k}": "${k}",`
+					`\t"${useSimplifiedKey ? simplifyKey(k) : k}": "${k}",`
 				)
 				return contentGroup
 			}, []).join("\n")
