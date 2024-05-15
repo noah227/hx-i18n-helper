@@ -39,12 +39,12 @@ const getDefaultLocaleContent = (rootPath, defaultLocaleName = "package.nls.json
 const simplifyKey = (key) => {
 	const configurationStart = "contributes.configuration.properties."
 	// 类似于contributes.commands.0.title这种的
-	if(/\w+\.\d/.test(key)) {
+	if (/\w+\.\d/.test(key)) {
 		const match = /\w+\.\d/.exec(key)
 		key = key.slice(match.index)
 	}
 	// 配置项的，类似于contributes.configuration.properties.hx-my-plugin.optionThis.description
-	else if(key.startsWith(configurationStart)){
+	else if (key.startsWith(configurationStart)) {
 		key = key.replace(configurationStart, "")
 	}
 	return key
@@ -103,13 +103,12 @@ const i18nHelper = (cwd = "") => {
 				// 配置的command自然也不需要i18n的
 				else if (k.endsWith(".command")) delete flatData[k]
 				// group也不需要
-				else if (k.endsWith("group")) delete flatData[k]
+				else if (k.endsWith(".group")) delete flatData[k]
 				else if (k.endsWith(".type")) delete flatData[k]
-				else if (k.endsWith(".default")) delete flatData[k]
 			}
-			// 加载现有nls文件
+			// 加载现有nls文件（package.nls.json，即默认nls文件）
 			const defaultLocaleContent = getDefaultLocaleContent(rootPath)
-			const saveNewData = {}
+			const saveNewData = autoClean ? {} : {...defaultLocaleContent}
 			// auto merge
 			for (let k in flatData) {
 				saveNewData[k] = flatData[k]?.startsWith("%") ? defaultLocaleContent[k] : defaultLocaleContent[k] || flatData[k]
@@ -128,7 +127,7 @@ const i18nHelper = (cwd = "") => {
 		 * @param {string} fileName
 		 * @param {boolean} useSimplifiedKey 是否使用简化的key；如果使用，请注意避免key冲突
 		 */
-		generateJsHelper(fileName = "helper.js", useSimplifiedKey=false) {
+		generateJsHelper(fileName = "helper.js", useSimplifiedKey = false) {
 			/** @type Object */
 			const data = getDefaultLocaleContent(rootPath)
 			const keyList = Object.keys(data)
@@ -180,11 +179,12 @@ const i18nHelper = (cwd = "") => {
 				fs.writeFileSync(defaultLocalePath, `{\n\t\n}`, {encoding: "utf8"})
 				console.warn("未检测到package.nls.json，已自动创建")
 			}
+			const defaultLocaleContent = getDefaultLocaleContentStr(rootPath)
 			localeList.forEach(locale => {
 				const filename = `package.nls.${locale}.json`
 				const fsPath = path.resolve(rootPath, filename)
 				if (!fs.existsSync(fsPath)) {
-					fs.writeFileSync(fsPath, getDefaultLocaleContentStr(rootPath), {encoding: "utf8"})
+					fs.writeFileSync(fsPath, defaultLocaleContent, {encoding: "utf8"})
 					console.log(`[init] ${filename}已创建`)
 				}
 			})
