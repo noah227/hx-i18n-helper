@@ -1,6 +1,6 @@
 {
 	"name": "hx-i18n-helper",
-	"version": "0.4.0",
+	"version": "0.4.1",
 	"description": "HBuilderX插件开发国际化辅助工具",
 	"main": "dist/index.js",
 	"scripts": {
